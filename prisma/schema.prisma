@@ -1,0 +1,467 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// ACCESS CONTROL
+// ---------------------------------------------------------------------
+
+enum RoleName {
+  SUPER_ADMIN
+  ADMIN
+  SALES_MANAGER
+  SALES_EXECUTIVE
+  INTERIOR_DESIGNER
+  PROJECT_MANAGER
+  SITE_SUPERVISOR
+  ACCOUNTANT
+  VIEWER
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  phone         String?
+  passwordHash  String
+  role          RoleName  @default(SALES_EXECUTIVE)
+  status        EmployeeStatus @default(ACTIVE)
+  joiningDate   DateTime  @default(now())
+  maxDiscountPct Decimal  @default(5) @db.Decimal(5, 2)
+
+  assignedLeads      Lead[]        @relation("AssignedLeads")
+  followUps          FollowUp[]    @relation("FollowUpOwner")
+  quotationsCreated   Quotation[]  @relation("QuotationSalesperson")
+  managedProjects     Project[]    @relation("ProjectManager")
+  tasksAssigned       Task[]       @relation("TaskAssignee")
+  siteVisitsAssigned  SiteVisit[]  @relation("SiteVisitAssignee")
+  documentsUploaded   Document[]   @relation("DocumentUploader")
+  notifications       Notification[]
+  activity            ActivityLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}
+
+// ---------------------------------------------------------------------
+// LEADS
+// ---------------------------------------------------------------------
+
+enum LeadSource {
+  INSTAGRAM
+  FACEBOOK_ADS
+  GOOGLE
+  WEBSITE
+  WHATSAPP
+  REFERRAL
+  WALK_IN
+  EXISTING_CLIENT
+  JUSTDIAL
+  OTHER
+}
+
+enum LeadStage {
+  NEW_LEAD
+  CONTACT_ATTEMPTED
+  CONTACTED
+  REQUIREMENT_DISCUSSED
+  SITE_VISIT_SCHEDULED
+  SITE_VISIT_COMPLETED
+  PROPOSAL_DESIGN
+  QUOTATION_SENT
+  NEGOTIATION
+  CONVERTED
+  LOST
+}
+
+enum LeadScore {
+  HOT
+  WARM
+  COLD
+}
+
+model Lead {
+  id                 String     @id @default(cuid())
+  leadNumber         String     @unique // e.g. LD-000123
+  name               String
+  phone              String
+  whatsapp           String?
+  email              String?
+  location            String?
+  address             String?
+
+  source             LeadSource @default(OTHER)
+
+  propertyType       String?
+  propertySize       String?
+  bedrooms           Int?
+  projectType        String?
+  budgetMin          Decimal?   @db.Decimal(12, 2)
+  budgetMax          Decimal?   @db.Decimal(12, 2)
+  projectLocation    String?
+  possessionDate     DateTime?
+  expectedStartDate  DateTime?
+
+  stage              LeadStage  @default(NEW_LEAD)
+  score              LeadScore  @default(WARM)
+  lostReason         String?
+
+  assignedToId       String?
+  assignedTo         User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
+
+  nextFollowUpAt     DateTime?
+
+  followUps          FollowUp[]
+  siteVisits         SiteVisit[]
+  quotations         Quotation[]
+  client             Client?
+  documents          Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stage])
+  @@index([score])
+  @@index([assignedToId])
+  @@index([phone])
+}
+
+enum FollowUpType {
+  CALL
+  WHATSAPP
+  EMAIL
+  MEETING
+  SITE_VISIT
+  VIDEO_CALL
+}
+
+enum FollowUpStatus {
+  SCHEDULED
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+}
+
+model FollowUp {
+  id           String         @id @default(cuid())
+  leadId       String
+  lead         Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type         FollowUpType
+  scheduledAt  DateTime
+  completedAt  DateTime?
+  status       FollowUpStatus @default(SCHEDULED)
+  outcome      String?
+  notes        String?
+
+  createdById  String
+  createdBy    User           @relation("FollowUpOwner", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([scheduledAt])
+}
+
+// ---------------------------------------------------------------------
+// CLIENTS
+// ---------------------------------------------------------------------
+
+model Client {
+  id            String   @id @default(cuid())
+  clientNumber  String   @unique // e.g. CL-000045
+  leadId        String   @unique
+  lead          Lead     @relation(fields: [leadId], references: [id])
+
+  name          String
+  phone         String
+  email         String?
+
+  quotations    Quotation[]
+  invoices      Invoice[]
+  projects      Project[]
+  documents     Document[]
+
+  convertedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// QUOTATIONS
+// ---------------------------------------------------------------------
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  VIEWED
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model Quotation {
+  id               String          @id @default(cuid())
+  quotationNumber  String          @unique // e.g. QT-2026-0142
+  version          Int             @default(1)
+  supersedesId     String?         @unique
+
+  leadId           String?
+  lead             Lead?           @relation(fields: [leadId], references: [id])
+  clientId         String?
+  client           Client?         @relation(fields: [clientId], references: [id])
+
+  salespersonId    String
+  salesperson      User            @relation("QuotationSalesperson", fields: [salespersonId], references: [id])
+
+  status           QuotationStatus @default(DRAFT)
+  validUntil       DateTime?
+  termsAndConditions String?
+  discountPct      Decimal         @default(0) @db.Decimal(5, 2)
+  requiresApproval Boolean         @default(false)
+  approvedById     String?
+
+  items            QuotationItem[]
+  invoices         Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([clientId])
+}
+
+model QuotationItem {
+  id            String    @id @default(cuid())
+  quotationId   String
+  quotation     Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  category      String
+  name          String
+  description   String?
+  quantity      Decimal   @db.Decimal(10, 2)
+  unit          String
+  rate          Decimal   @db.Decimal(12, 2)
+  discountPct   Decimal   @default(0) @db.Decimal(5, 2)
+  gstPct        Decimal   @default(18) @db.Decimal(5, 2)
+  sortOrder     Int       @default(0)
+}
+
+// ---------------------------------------------------------------------
+// INVOICES + PAYMENTS
+// ---------------------------------------------------------------------
+
+enum InvoiceType {
+  ADVANCE
+  STAGE_WISE
+  FINAL
+  CUSTOM
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  invoiceNumber  String        @unique // e.g. INV-2026-0311
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  quotationId    String?
+  quotation      Quotation?    @relation(fields: [quotationId], references: [id])
+  projectId      String?
+  project        Project?      @relation(fields: [projectId], references: [id])
+
+  type           InvoiceType
+  status         InvoiceStatus @default(DRAFT)
+  invoiceDate    DateTime      @default(now())
+  dueDate        DateTime?
+  totalAmount    Decimal       @db.Decimal(12, 2)
+
+  payments       Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([clientId])
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  CARD
+  OTHER
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id])
+  amount          Decimal       @db.Decimal(12, 2)
+  method          PaymentMethod
+  referenceNumber String?
+  notes           String?
+  paidAt          DateTime      @default(now())
+
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// PROJECTS + TASKS
+// ---------------------------------------------------------------------
+
+enum ProjectStage {
+  PLANNING
+  DESIGN
+  APPROVAL
+  PRODUCTION
+  PROCUREMENT
+  EXECUTION
+  INSTALLATION
+  HANDOVER
+  COMPLETED
+}
+
+model Project {
+  id                  String       @id @default(cuid())
+  projectNumber       String       @unique // e.g. PRJ-000021
+  clientId            String
+  client              Client       @relation(fields: [clientId], references: [id])
+
+  projectManagerId    String?
+  projectManager      User?        @relation("ProjectManager", fields: [projectManagerId], references: [id])
+
+  siteLocation        String?
+  startDate           DateTime?
+  expectedCompletion  DateTime?
+  budget              Decimal?     @db.Decimal(12, 2)
+  value               Decimal?     @db.Decimal(12, 2)
+  stage               ProjectStage @default(PLANNING)
+
+  tasks               Task[]
+  invoices            Invoice[]
+  siteVisits          SiteVisit[]
+  documents           Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stage])
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  projectId   String?
+  project     Project?     @relation(fields: [projectId], references: [id])
+  title       String
+  description String?
+  assigneeId  String?
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+  status      TaskStatus   @default(TODO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([assigneeId])
+}
+
+// ---------------------------------------------------------------------
+// SITE VISITS, DOCUMENTS, NOTIFICATIONS, ACTIVITY LOG
+// ---------------------------------------------------------------------
+
+model SiteVisit {
+  id            String    @id @default(cuid())
+  leadId        String?
+  lead          Lead?     @relation(fields: [leadId], references: [id])
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id])
+
+  scheduledAt   DateTime
+  assignedToId  String?
+  assignedTo    User?     @relation("SiteVisitAssignee", fields: [assignedToId], references: [id])
+  notes         String?
+  measurements  Json?
+  photoUrls     Json?
+
+  createdAt DateTime @default(now())
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id])
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id])
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+
+  category    String
+  fileName    String
+  url         String
+
+  uploadedById String
+  uploadedBy   User    @relation("DocumentUploader", fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  tone      String   @default("primary") // primary | success | warning | error
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // e.g. "LEAD_CREATED", "STAGE_CHANGED"
+  entityType String   // e.g. "Lead", "Quotation"
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
