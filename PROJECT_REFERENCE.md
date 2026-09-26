@@ -175,6 +175,14 @@ Postgres via Prisma. Full entity list:
 - **ActivityLog** — userId, action (string, e.g. `"LEAD_CREATED"`), entityType, entityId,
   metadata (Json).
 
+- **InvoiceItem** — invoice lines: description, hsnSac, quantity, unit, rate, gstPct. `Invoice.totalAmount`
+  is always recomputed server-side from these lines. Invoice also has `notes`.
+- **CompanySettings** — single row (`id = "default"`, read via `getCompanySettings()`): company details,
+  GSTIN/PAN, logo / letterhead header / footer / signature as PNG/JPEG data URLs, bank + UPI, signatory,
+  default quotation/invoice terms, quotation validity days.
+- **Client** also has `address` and `gstin`; **SiteVisit** has `completedAt`; **Document** stores the file
+  in `data` (bytes) with `mimeType` and `size`.
+
 All models have `createdAt`/`updatedAt` where relevant, and indexes on the fields actually
 queried (stage, score, assignedToId, phone, status, etc.) — check the schema before adding
 a new query pattern that isn't indexed yet.
@@ -310,66 +318,73 @@ as-is for every future export button; don't write a new download handler per mod
 
 ## 9. What's fully implemented right now
 
-- Auth (login, session, middleware protection, role in session)
-- Full RBAC permission matrix, enforced at both page and API level
-- Dashboard — role-aware live stats (hot leads, today's follow-ups, pending quotations,
-  monthly revenue gated by financial permission), "Attention Required" overdue-lead panel
-- Leads — list (search), Pipeline board (11 stages), lead detail page (contact actions,
-  info, follow-up history), quick-add 2-step form with duplicate-phone detection,
-  **Excel export**
-- Clients — list (search), **Excel export**
-- Follow-ups — Today / Overdue / Upcoming tabs
-- Tasks — list with priority chips, role-scoped for Site Supervisor / Interior Designer
-- Seed script — 1 user per all 9 roles, 6 sample leads across different stages/scores, 1
-  converted client + project + 2 tasks
+- **Auth**: login, JWT session, middleware protection. Role/status re-checked from the DB every 60s
+  (`src/lib/auth.ts` jwt callback) — deactivating an employee or changing their role takes effect
+  within a minute. 5 failed logins per email → 10-minute lockout (in-memory).
+- **RBAC** enforced at page and API level; sidebar, bottom bar and More screen only show modules the
+  role can view.
+- **Dashboard** — role-aware cards (hot leads, today's follow-ups, quotations awaiting client,
+  collections, outstanding, active projects, my tasks), discount-approval banner for admins.
+- **Global search** (`/search`) across leads, clients, quotations, invoices (role-scoped).
+- **Leads** — list with score filter, pipeline board, detail page with stage/score change, edit,
+  follow-up log/schedule, convert to client (`POST /api/leads/[id]/convert`), mark lost, delete.
+  Lead PATCH uses a zod allow-list (no mass assignment).
+- **Follow-ups** — Today / Overdue / Upcoming / Completed with mark-done / cancel.
+  `Lead.nextFollowUpAt` is kept in sync by `src/lib/followups.ts`.
+- **Clients** — list + detail (projects, quotations, invoices, billed/received/outstanding), edit
+  billing address + GSTIN (printed on PDFs).
+- **Quotations** — full-page editor (rooms/categories, line + overall discount, GST per line),
+  edit drafts, discount approval (effective discount vs `DISCOUNT_LIMITS`), mark sent → client
+  accepted/rejected, revisions (`QT-…-R2`, the old one expires), delete. All money math lives in
+  `src/lib/totals.ts` (run `npm run check`).
+- **Letterhead + PDFs** — Settings → Letterhead: either a designed header from company details + logo,
+  or an uploaded header/footer image placed edge-to-edge on every page. Bank/UPI box, signatory
+  + signature image, default terms. PDFs are rendered server-side with `@react-pdf/renderer` and the
+  Afacad TTFs in `src/assets/fonts` (`src/lib/pdf.tsx`; data mapping in `src/lib/documentPdf.ts`).
+- **Sharing** — Download PDF, Preview, native share sheet (sends the PDF file on phones), WhatsApp,
+  email, copy link. Client links are `/share/{quotation|invoice|agreement|workorder|cos}/{id}?t=…` — HMAC-signed with
+  `NEXTAUTH_SECRET`, no login needed, excluded in `middleware.ts`. Rotating the secret revokes all links.
+- **Invoices** — `InvoiceItem` lines with HSN/SAC + GST; create from a quotation (copy all items or
+  bill X% split by GST rate), blocked from exceeding what's left to bill on the quotation; issue,
+  edit draft, cancel/reopen, due date, delete. OVERDUE is derived from the due date at read time
+  (`effectiveInvoiceStatus` in `src/lib/invoices.ts`).
+- **Payments** — record against an invoice (can't exceed balance), status auto-updates, admins can
+  remove a payment; Payments page with method filter + export.
+- **Projects** — list with progress, create from client (value defaults to accepted quotation),
+  detail with stage timeline / advance stage, PM + dates, tasks, invoices, site visits, documents.
+- **Agreement & work order** (`Agreement` model, one active per project) — created from the
+  client's accepted quotation on the project page (`/projects/[id]/agreement`): dates, payment
+  milestones (must total 100%), exclusions, work-order instructions, numbered terms (defaults in
+  Settings → Agreements). The same record prints two PDFs: the Agreement (intro, clauses, payment
+  schedule, two-party signatures, Annexure A scope) and the Work Order (scope, schedule, sign-off).
+  Draft → Sent → Signed (locked) / Cancelled. PDFs in `src/lib/contractPdf.ts`.
+- **Change of scope (COS)** (`ChangeOrder` + `ChangeOrderItem`) — additions and deductions with GST
+  per line, reason, timeline impact (days). Draft → Sent → Client approved / Rejected. Approval adds
+  the net amount to `Project.value` and shifts `expectedCompletion`. Approved COS can be invoiced
+  (`Invoice.changeOrderId`), capped at the COS net. Maths in `changeOrderTotals` (`src/lib/contracts.ts`).
+- **Tasks** — shared `TaskBoard` (tasks page + project page): create/edit/complete/delete.
+- **Site visits** — schedule for a lead or project, reschedule, complete with measurements; moves
+  the lead's stage forward automatically.
+- **Documents** — upload (≤10 MB, stored in Postgres `Document.data`), preview/download, delete.
+- **Employees** — add, edit role/status, reset password, delete (Super Admin only). Delete unassigns
+  open leads/tasks/visits/projects; employees with history are anonymised and hidden (`User.deletedAt`)
+  so past records keep their author. At least one active Super Admin is always kept.
+- **Confirmations** use the in-app `ask()` dialog (`src/components/confirm.tsx`), never
+  `window.confirm/prompt` — those are silently blocked in installed PWAs and some browsers.
+- **Production**: security headers in `next.config.mjs`, `error.tsx` / `loading.tsx` / `not-found.tsx`,
+  `npm run db:deploy`, `npm run create-admin`. See README → Going live.
+- **Reports** — date presets, leads by source, pipeline, win rate, quoted/invoiced/collected,
+  outstanding, 6-month collections, sales team table.
+- Excel export for leads, clients, quotations, invoices, payments.
 
-## 10. What's NOT implemented yet (stub pages only, schema already supports them)
+## 10. What's NOT implemented yet
 
-Quotations, Invoices, Payments, Projects, Site Visits, Documents, Employees, Reports,
-Settings — each currently renders a static `<EmptyState>` from `moduleMeta.ts`. None have
-API routes yet. Suggested build order, since each depends on the last:
-
-1. **Quotations** — the workflow is stuck without this. Needs: quotation builder UI (item
-   line editor against `QuotationItem`), the discount-approval workflow using
-   `DISCOUNT_LIMITS` from `permissions.ts` (a quotation with `discountPct` over the
-   salesperson's limit should set `requiresApproval: true` and block sending until an
-   Admin/Super Admin approves), and PDF/letterhead generation (not started — will need a
-   PDF library; `@react-pdf/renderer` or generating HTML and using a headless-browser PDF
-   service are the two common approaches; letterhead config — logo, GST/PAN, bank details,
-   signature — needs its own Settings-module table, which doesn't exist in the schema yet
-   and should be added).
-2. **Invoices** — straightforward once Quotations exist; an Invoice mostly copies items from
-   an approved Quotation. Needs its own PDF generation too (reuse whatever approach is built
-   for Quotations).
-3. **Payments** — simple CRUD against `Invoice`; the running-balance /
-   "outstanding amount" calculation is derived (`invoice.totalAmount - sum(payments)`), not
-   stored — write that as a small utility function, not duplicated inline math.
-4. **Projects** — mostly ready to build directly; `Project` already has everything needed
-   (stage, budget, value, projectManager). The visual stage timeline (Planning → Completed)
-   is the main new UI piece.
-5. **Site Visits, Documents** — Documents needs real file storage (S3/Cloudflare R2/etc.)
-   wired in; nothing in the schema or app currently uploads a file anywhere.
-6. **Employees** — Super Admin/Admin only CRUD over `User` + role assignment. Straightforward
-   given the permission matrix already exists.
-7. **Reports** — aggregation queries over existing data; no new schema needed, just charts
-   (recharts is already an approved dependency in most Claude environments if you're
-   building this back in an artifact-style tool, otherwise install it) plus date-range
-   filtering.
-8. **Settings** — pipeline stage customization, GST rates, custom fields, letterhead config.
-   This is the one module that needs *new* schema (a settings/config table) since the brief
-   asks for these to be configurable without code changes — currently pipeline stages
-   (`LeadStage` enum) and everything else are hardcoded in the Prisma schema and would
-   require a migration to change. If "Super Admin can customize without code changes" is a
-   hard requirement, this is the biggest architectural gap to close and worth doing before
-   client demos, not after.
-
-Also not started: PWA offline support (manifest exists, no service worker yet — needs a
-caching strategy, `next-pwa` or a hand-rolled service worker), WhatsApp Business API /
-Meta Lead Ads / other future integrations (§39 of the original brief), export for anything
-beyond Leads/Clients (Quotations/Invoices/Payments/Projects should get the same
-`buildExcelWorkbook` treatment once they exist).
-
----
+- Custom pipeline stages / custom fields (stages are still the `LeadStage` enum).
+- GST split into CGST/SGST vs IGST on PDFs (shown as a single GST line).
+- In-app notifications feed (the bell shows computed alerts, not the `Notification` table).
+- PWA offline support (manifest + icon exist, no service worker).
+- WhatsApp Business API / Meta Lead Ads integrations; "viewed" tracking of share links.
+- Documents live in Postgres — move to S3/R2 if volume grows.
 
 ## 11. Setup
 
@@ -378,7 +393,8 @@ cp .env.example .env       # set DATABASE_URL (Postgres) and NEXTAUTH_SECRET
 npm install
 npx prisma generate
 npx prisma migrate dev     # creates the schema
-npm run seed                # demo users + sample data
+npm run seed                # demo users + sample data + default letterhead settings
+npm run check               # money-math self-check (src/lib/totals.check.ts)
 npm run dev
 ```
 
@@ -389,11 +405,10 @@ in `prisma/seed.ts` for local dev only — never ship that to production).
 
 ## 12. Known gaps / things to double check when resuming
 
-- Full `tsc --noEmit` against generated Prisma types hasn't run yet (blocked in the build
-  sandbox — see §4). Run it first.
-- No automated tests exist anywhere in the project yet.
+- `tsc --noEmit` and `next build` both pass against the generated Prisma client.
+- Only automated check is `npm run check` (money math). No end-to-end tests.
 - No CI config.
-- No rate limiting / brute-force protection on the login route.
+- Login lockout is in-memory per server instance; use Redis if you run multiple instances.
 - Prisma `Decimal` fields are being `.toString()`'d manually at each server/client boundary
   — if this gets error-prone as more modules are added, consider a small serialization
   helper instead of repeating it.
