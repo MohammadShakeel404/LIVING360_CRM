@@ -138,3 +138,25 @@ export function can(role: RoleName, module: Module, action: Action): boolean {
 export function hasFinancialAccess(role: RoleName, module: Module): boolean {
   return can(role, module, "financial");
 }
+
+export const ROLE_LABEL: Record<RoleName, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Admin",
+  SALES_MANAGER: "Sales Manager",
+  SALES_EXECUTIVE: "Sales Executive",
+  INTERIOR_DESIGNER: "Interior Designer",
+  PROJECT_MANAGER: "Project Manager",
+  SITE_SUPERVISOR: "Site Supervisor",
+  ACCOUNTANT: "Accountant",
+  VIEWER: "Viewer",
+};
+
+/** Only these roles can approve a quotation whose discount exceeds the creator's limit. */
+export function canApproveDiscount(role: RoleName) {
+  return role === "SUPER_ADMIN" || role === "ADMIN";
+}
+
+/** Agreements, work orders and change-of-scope documents: project editors with financial access. */
+export function canManageContracts(role: RoleName) {
+  return can(role, "projects", "edit") && can(role, "projects", "financial");
+}

@@ -19,10 +19,11 @@ export default function LoginPage() {
     const res = await signIn("credentials", { email, password, redirect: false });
     setLoading(false);
     if (res?.error) {
-      setError("That email and password combination doesn't match our records.");
+      setError(res.error === "LOCKED" ? "Too many failed attempts. Try again in 10 minutes." : "That email and password combination doesn't match our records.");
       return;
     }
     router.push("/dashboard");
+    router.refresh();
   }
 
   return (

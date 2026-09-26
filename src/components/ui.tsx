@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { LucideIcon } from "lucide-react";
-import { Flame, Sun, Snowflake } from "lucide-react";
+import { Flame, Sun, Snowflake, ChevronLeft } from "lucide-react";
 
 export function initialsOf(name: string) {
   return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
@@ -50,11 +51,11 @@ export function PriorityChip({ priority }: { priority: string }) {
 export function StatCard({
   label, value, sub, subTone = "text-ink", icon: Icon, href,
 }: { label: string; value: string | number; sub?: string; subTone?: string; icon?: LucideIcon; href?: string }) {
-  const Comp: any = href ? "a" : "div";
+  const Comp: any = href ? Link : "div";
   return (
     <Comp
       href={href}
-      className="min-w-0 rounded-xl2 border border-line bg-white p-4 text-left block transition-transform active:scale-[0.98]"
+      className="block min-w-0 rounded-xl2 border border-line bg-white p-4 text-left transition-all hover:border-primary/30 hover:shadow-[0_4px_16px_rgba(37,26,81,0.06)] active:scale-[0.98]"
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[12.5px] font-medium text-ink-soft">{label}</span>
@@ -71,9 +72,9 @@ export function SectionHeader({ title, actionHref, actionLabel }: { title: strin
     <div className="mb-3 flex items-center justify-between">
       <h2 className="text-base font-semibold text-ink">{title}</h2>
       {actionHref && (
-        <a href={actionHref} className="text-[13px] font-semibold text-primary">
+        <Link href={actionHref} className="text-[13px] font-semibold text-primary">
           {actionLabel ?? "View all"}
-        </a>
+        </Link>
       )}
     </div>
   );
@@ -209,4 +210,73 @@ export function formatDate(d?: string | Date | null) {
 export function formatDateTime(d?: string | Date | null) {
   if (!d) return "—";
   return new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+}
+
+/* ---------- Form primitives ---------- */
+
+export const inputCls =
+  "w-full rounded-[10px] border-[1.5px] border-line bg-appbg px-3 py-2.5 text-[16px] outline-none transition-colors focus:border-primary focus:bg-white md:text-[14.5px]";
+
+export function Field({ label, hint, children, className = "" }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`flex flex-col gap-1.5 ${className}`}>
+      <span className="text-[12.5px] font-medium text-ink-soft">{label}</span>
+      {children}
+      {hint && <span className="text-[11.5px] text-ink-faint">{hint}</span>}
+    </label>
+  );
+}
+
+export function Card({ title, subtitle, action, children, className = "" }: { title?: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl2 border border-line bg-white ${className}`}>
+      {(title || action) && (
+        <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-3">
+          <div>
+            {title && <div className="text-[14px] font-semibold text-ink">{title}</div>}
+            {subtitle && <div className="text-[12px] text-ink-soft">{subtitle}</div>}
+          </div>
+          {action}
+        </div>
+      )}
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+export function PageHeader({ title, subtitle, back, actions }: { title: string; subtitle?: React.ReactNode; back?: string; actions?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        {back && (
+          <Link href={back} aria-label="Back" className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-line bg-white text-ink-soft hover:text-primary">
+            <ChevronLeft size={17} />
+          </Link>
+        )}
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-ink md:text-[22px]">{title}</h1>
+          {subtitle && <div className="mt-0.5 text-[13px] text-ink-soft">{subtitle}</div>}
+        </div>
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+export const btn = {
+  primary: "inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3.5 py-[9px] text-[13px] font-semibold text-white transition-colors hover:bg-primary-deep disabled:opacity-50",
+  secondary: "inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-line bg-white px-3.5 py-[9px] text-[13px] font-semibold text-ink transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50",
+  ghost: "inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-line-soft px-3.5 py-[9px] text-[13px] font-semibold text-primary transition-colors hover:bg-[#E6E0F5] disabled:opacity-50",
+  danger: "inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-danger/30 bg-white px-3.5 py-[9px] text-[13px] font-semibold text-danger transition-colors hover:bg-danger-bg disabled:opacity-50",
+  success: "inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-success px-3.5 py-[9px] text-[13px] font-semibold text-white disabled:opacity-50",
+};
+
+export function MiniStat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="rounded-xl2 border border-line bg-white p-3.5">
+      <div className="text-[12px] font-medium text-ink-soft">{label}</div>
+      <div className={`mt-1 truncate text-[19px] font-bold ${tone ?? "text-ink"}`}>{value}</div>
+      {sub && <div className="text-[11.5px] text-ink-faint">{sub}</div>}
+    </div>
+  );
 }

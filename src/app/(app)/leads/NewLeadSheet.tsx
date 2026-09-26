@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { LeadListItem } from "./LeadsClient";
+import { toast } from "@/components/toast";
 
-const SOURCES = ["INSTAGRAM", "FACEBOOK_ADS", "GOOGLE", "WEBSITE", "REFERRAL", "WALK_IN", "JUSTDIAL", "OTHER"];
-const PROPERTY_TYPES = ["1 BHK Apartment", "2 BHK Apartment", "3 BHK Apartment", "4 BHK Villa", "Independent House"];
+import { LEAD_SOURCES as SOURCES, PROPERTY_TYPES, humanize } from "@/lib/labels";
+
+const EMPTY = { name: "", phone: "", email: "", source: "INSTAGRAM", propertyType: PROPERTY_TYPES[1], budgetMin: "", budgetMax: "", location: "" };
 
 const inputCls = "rounded-[10px] border-[1.5px] border-line bg-appbg px-3 py-2.5 text-[14.5px] outline-none focus:border-primary";
 
@@ -13,7 +15,7 @@ export function NewLeadSheet({
   open, onClose, onCreated,
 }: { open: boolean; onClose: () => void; onCreated: (lead: LeadListItem) => void }) {
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ name: "", phone: "", source: "INSTAGRAM", propertyType: PROPERTY_TYPES[1], budgetMin: "", budgetMax: "", location: "" });
+  const [form, setForm] = useState(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export function NewLeadSheet({
   const steps = ["Contact", "Requirement"];
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
-  const canNext = step === 0 ? form.name.trim() && form.phone.trim() : true;
+  const canNext = step === 0 ? form.name.trim() && form.phone.replace(/\D/g, "").length >= 10 && (!form.email || /^\S+@\S+\.\S+$/.test(form.email)) : true;
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -34,24 +36,25 @@ export function NewLeadSheet({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name, phone: form.phone, source: form.source, propertyType: form.propertyType,
+          name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim(), source: form.source, propertyType: form.propertyType,
           budgetMin: form.budgetMin ? Number(form.budgetMin) : undefined,
           budgetMax: form.budgetMax ? Number(form.budgetMax) : undefined,
           projectLocation: form.location,
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Couldn't create the lead.");
-      if (body.duplicateWarning) {
-        setDupWarning(`Heads up — ${body.duplicateWarning.name} already has this phone number on file.`);
-      }
+      if (!res.ok) throw new Error(typeof body.error === "string" ? body.error : "Please check the details and try again.");
+      const dup = body.duplicateWarning;
+      if (dup) setDupWarning(`Heads up — ${dup.name} already has this phone number on file.`);
       onCreated({
         ...body.lead,
         budgetMin: body.lead.budgetMin?.toString() ?? null,
         budgetMax: body.lead.budgetMax?.toString() ?? null,
         assignedTo: null,
       });
-      setTimeout(onClose, dupWarning ? 1400 : 0);
+      toast(`Lead ${body.lead.leadNumber} created.`);
+      setForm(EMPTY);
+      setTimeout(onClose, dup ? 2200 : 0);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -81,10 +84,11 @@ export function NewLeadSheet({
           {step === 0 && (
             <div className="flex flex-col gap-3">
               <Field label="Full name"><input value={form.name} onChange={set("name")} placeholder="e.g. Rahul Verma" className={inputCls} /></Field>
-              <Field label="Mobile number"><input value={form.phone} onChange={set("phone")} placeholder="+91 98xxxxxxx" className={inputCls} /></Field>
+              <Field label="Mobile number"><input value={form.phone} onChange={set("phone")} inputMode="tel" placeholder="+91 98xxxxxxx" className={inputCls} /></Field>
+              <Field label="Email (optional)"><input type="email" value={form.email} onChange={set("email")} placeholder="name@example.com" className={inputCls} /></Field>
               <Field label="Lead source">
                 <select value={form.source} onChange={set("source")} className={inputCls}>
-                  {SOURCES.map((s) => <option key={s} value={s}>{s.replaceAll("_", " ")}</option>)}
+                  {SOURCES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
                 </select>
               </Field>
             </div>
@@ -97,8 +101,8 @@ export function NewLeadSheet({
                 </select>
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Budget min (₹)"><input value={form.budgetMin} onChange={set("budgetMin")} placeholder="e.g. 1500000" className={inputCls} /></Field>
-                <Field label="Budget max (₹)"><input value={form.budgetMax} onChange={set("budgetMax")} placeholder="e.g. 1800000" className={inputCls} /></Field>
+                <Field label="Budget min (₹)"><input type="number" min={0} value={form.budgetMin} onChange={set("budgetMin")} placeholder="e.g. 1500000" className={inputCls} /></Field>
+                <Field label="Budget max (₹)"><input type="number" min={0} value={form.budgetMax} onChange={set("budgetMax")} placeholder="e.g. 1800000" className={inputCls} /></Field>
               </div>
               <Field label="Project location"><input value={form.location} onChange={set("location")} placeholder="e.g. Whitefield, Bengaluru" className={inputCls} /></Field>
             </div>

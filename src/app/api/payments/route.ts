@@ -1,126 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { z } from "zod";
+import { PaymentMethod } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 import { buildPaymentWhere } from "@/lib/paymentWhere";
-import { PaymentMethod } from "@prisma/client";
-import { z } from "zod";
+import { refreshInvoiceStatus } from "@/lib/invoices";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user.role, "payments", "view")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const where = buildPaymentWhere(req.nextUrl.searchParams);
+  if (!can(session.user.role, "payments", "view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const payments = await prisma.payment.findMany({
-    where,
-    include: {
-      invoice: {
-        select: {
-          id: true,
-          invoiceNumber: true,
-          totalAmount: true,
-          client: { select: { id: true, name: true } }
-        }
-      }
-    },
+    where: buildPaymentWhere(req.nextUrl.searchParams),
+    include: { invoice: { select: { id: true, invoiceNumber: true, client: { select: { id: true, name: true } } } } },
     orderBy: { paidAt: "desc" },
     take: 200,
   });
-
   const financial = can(session.user.role, "payments", "financial");
-  
-  const shaped = payments.map((p) => ({
-    ...p,
-    amount: financial ? p.amount.toString() : null,
-    paidAt: p.paidAt.toISOString(),
-    createdAt: p.createdAt.toISOString(),
-    invoice: {
-      ...p.invoice,
-      totalAmount: financial ? p.invoice.totalAmount.toString() : null,
-    }
-  }));
-
-  return NextResponse.json({ payments: shaped });
+  return NextResponse.json({ payments: payments.map((p) => ({ ...p, amount: financial ? Number(p.amount) : null })) });
 }
 
 const createSchema = z.object({
   invoiceId: z.string().min(1),
-  amount: z.number().positive(),
+  amount: z.number().positive("Amount must be more than 0"),
   method: z.nativeEnum(PaymentMethod),
-  referenceNumber: z.string().optional(),
-  notes: z.string().optional(),
-  paidAt: z.string().optional(),
+  referenceNumber: z.string().trim().max(80).optional().nullable(),
+  notes: z.string().trim().max(500).optional().nullable(),
+  paidAt: z.string().optional().nullable(),
 });
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user.role, "payments", "create")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  if (!can(session.user.role, "payments", "create")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body = await req.json();
-  const parsed = createSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
-  }
+  const parsed = createSchema.safeParse(await req.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payment" }, { status: 422 });
   const data = parsed.data;
 
-  // 1. Fetch the invoice to check balances and validate it exists
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: data.invoiceId },
-    include: { payments: true }
-  });
+  const invoice = await prisma.invoice.findUnique({ where: { id: data.invoiceId }, include: { payments: { select: { amount: true } } } });
+  if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  if (invoice.status === "CANCELLED") return NextResponse.json({ error: "This invoice is cancelled." }, { status: 409 });
 
-  if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  const balance = Number(invoice.totalAmount) - invoice.payments.reduce((s, p) => s + Number(p.amount), 0);
+  if (data.amount > balance + 0.5) {
+    return NextResponse.json({ error: `That's more than the balance due (₹${balance.toLocaleString("en-IN", { maximumFractionDigits: 2 })}).` }, { status: 422 });
+  }
+  const paidAt = data.paidAt ? new Date(data.paidAt) : new Date();
+  if (Number.isNaN(paidAt.getTime()) || paidAt > new Date(Date.now() + 86400000)) {
+    return NextResponse.json({ error: "Payment date can't be in the future." }, { status: 422 });
   }
 
-  // 2. Create the payment
   const payment = await prisma.payment.create({
     data: {
-      invoiceId: data.invoiceId,
+      invoiceId: invoice.id,
       amount: data.amount,
       method: data.method,
       referenceNumber: data.referenceNumber || null,
       notes: data.notes || null,
-      paidAt: data.paidAt ? new Date(data.paidAt) : new Date(),
+      paidAt,
     },
   });
-
-  // 3. Recalculate invoice status
-  const existingPaymentsTotal = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const newTotalPaid = existingPaymentsTotal + data.amount;
-  
-  let newStatus = invoice.status;
-  if (newTotalPaid >= Number(invoice.totalAmount)) {
-    newStatus = "PAID";
-  } else if (newTotalPaid > 0) {
-    newStatus = "PARTIALLY_PAID";
-  }
-
-  // 4. Update the invoice status if it changed
-  if (newStatus !== invoice.status) {
-    await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { status: newStatus }
-    });
-  }
+  // Recording a payment on a draft means it has effectively been issued.
+  if (invoice.status === "DRAFT") await prisma.invoice.update({ where: { id: invoice.id }, data: { status: "SENT" } });
+  const result = await refreshInvoiceStatus(invoice.id);
 
   await prisma.activityLog.create({
-    data: {
-      userId: session.user.id,
-      action: "PAYMENT_LOGGED",
-      entityType: "Payment",
-      entityId: payment.id,
-      metadata: { invoiceNumber: invoice.invoiceNumber, amount: data.amount }
-    },
+    data: { userId: session.user.id, action: "PAYMENT_LOGGED", entityType: "Payment", entityId: payment.id, metadata: { invoiceNumber: invoice.invoiceNumber, amount: data.amount } },
   });
-
-  return NextResponse.json({ payment, newInvoiceStatus: newStatus }, { status: 201 });
+  return NextResponse.json({ payment: { id: payment.id }, invoiceStatus: result?.status }, { status: 201 });
 }

@@ -77,6 +77,19 @@ async function main() {
     ],
   });
 
+  // Letterhead / document defaults — edit these in Settings.
+  await prisma.companySettings.upsert({
+    where: { id: "default" },
+    update: {},
+    create: {
+      id: "default",
+      companyName: "Living 360",
+      tagline: "Interior Design & Execution",
+      quotationTerms: "50% advance to confirm the order.\n40% on delivery of materials to site, 10% on handover.\nPrices are valid until the date shown above.\nAny work outside this scope will be quoted separately.",
+      invoiceTerms: "Payment due by the date shown above.\nPlease quote the invoice number with your payment.",
+    },
+  });
+
   console.log(`Seeded ${users.length} users, ${createdLeads.length} leads, 1 client/project.`);
   console.log(`Demo login: superadmin@living360.in / ${DEMO_PASSWORD}`);
 }

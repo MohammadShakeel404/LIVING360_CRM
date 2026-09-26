@@ -6,6 +6,7 @@ import { can } from "@/lib/permissions";
 import { LeadSource, LeadStage, LeadScore } from "@prisma/client";
 import { z } from "zod";
 import { buildLeadWhere } from "@/lib/leadWhere";
+import { nextNumber } from "@/lib/numbering";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -40,8 +41,8 @@ export async function GET(req: NextRequest) {
 }
 
 const createLeadSchema = z.object({
-  name: z.string().min(1),
-  phone: z.string().min(6),
+  name: z.string().trim().min(1, "Name is required").max(120),
+  phone: z.string().trim().min(6, "Enter a valid phone number").max(20),
   whatsapp: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   source: z.nativeEnum(LeadSource).default(LeadSource.OTHER),
@@ -62,15 +63,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const parsed = createLeadSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid lead" }, { status: 422 });
   }
   const data = parsed.data;
 
   // Duplicate detection (item 34 of the brief) — warn on exact phone match rather than block.
-  const dup = await prisma.lead.findFirst({ where: { phone: data.phone } });
+  const digits = data.phone.replace(/\D/g, "").slice(-10);
+  const dup = await prisma.lead.findFirst({ where: { phone: { contains: digits } }, select: { id: true, name: true } });
 
-  const count = await prisma.lead.count();
-  const leadNumber = `LD-${(1000 + count + 1).toString()}`;
+  const leadNumber = await nextNumber("lead", "LD-", 1000);
 
   const lead = await prisma.lead.create({
     data: {

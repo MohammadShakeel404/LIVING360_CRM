@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Living 360",
   description: "Business management for Living 360 interior design studio",
   manifest: "/manifest.json",
-  icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
+  icons: { icon: [{ url: "/icons/icon-192.png", sizes: "192x192" }, { url: "/icon.svg", type: "image/svg+xml" }], apple: "/icons/apple-touch-icon.png" },
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Living 360" },
 };
 
@@ -14,7 +14,6 @@ export const viewport: Viewport = {
   themeColor: "#251A51",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

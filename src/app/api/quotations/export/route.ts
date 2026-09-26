@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 import { buildQuotationWhere } from "@/lib/quotationWhere";
 import { buildExcelWorkbook, excelResponseHeaders } from "@/lib/excel";
+import { quotationTotals } from "@/lib/totals";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -36,23 +37,16 @@ export async function GET(req: NextRequest) {
   const columns = [
     { header: "Quotation #", width: 18, value: (r: Row) => r.quotationNumber },
     { header: "Client", width: 22, value: (r: Row) => r.client?.name ?? r.lead?.name ?? "—" },
-    { header: "Status", width: 14, value: (r: Row) => r.status },
+    { header: "Status", width: 14, value: (r: Row) => (r.status === "APPROVED" ? "ACCEPTED" : r.status) },
     { header: "Items", width: 8, value: (r: Row) => r.items.length },
     { header: "Salesperson", width: 20, value: (r: Row) => r.salesperson.name },
-    { header: "Created", width: 14, value: (r: Row) => r.createdAt },
+    { header: "Created", width: 14, value: (r: Row) => r.createdAt, numFmt: "dd-mmm-yyyy" },
+    { header: "Valid until", width: 14, value: (r: Row) => r.validUntil, numFmt: "dd-mmm-yyyy" },
     ...(financial
       ? [
-          {
-            header: "Total (excl. GST)",
-            width: 18,
-            value: (r: Row) =>
-              r.items.reduce((sum, i) => {
-                const base = Number(i.quantity) * Number(i.rate);
-                const disc = base * (Number(i.discountPct) / 100);
-                return sum + (base - disc);
-              }, 0),
-            numFmt: "₹#,##0",
-          },
+          { header: "Taxable value", width: 16, value: (r: Row) => quotationTotals(r.items, r.discountPct).taxable, numFmt: "#,##0.00" },
+          { header: "GST", width: 14, value: (r: Row) => quotationTotals(r.items, r.discountPct).gst, numFmt: "#,##0.00" },
+          { header: "Grand total", width: 16, value: (r: Row) => quotationTotals(r.items, r.discountPct).grandTotal, numFmt: "#,##0.00" },
         ]
       : []),
   ];
@@ -60,10 +54,10 @@ export async function GET(req: NextRequest) {
   const buffer = await buildExcelWorkbook({
     sheetName: "Quotations",
     title: "Quotations Export",
-    subtitle: `Exported on ${new Date().toLocaleDateString("en-IN")}`,
+    subtitle: `Exported by ${session.user.name} on ${new Date().toLocaleString("en-IN")} · ${quotations.length} record(s)`,
     columns,
     rows: quotations,
   });
 
-  return new NextResponse(buffer as any, { headers: excelResponseHeaders("Living360_Quotations.xlsx") });
+  return new NextResponse(buffer as any, { headers: excelResponseHeaders(`living360-quotations-${new Date().toISOString().slice(0, 10)}.xlsx`) });
 }
