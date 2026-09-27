@@ -7,7 +7,7 @@ import { signOut } from "next-auth/react";
 import {
   Home, Flame, Users, ListChecks, MoreHorizontal, Plus, Search, Bell,
   ChevronDown, FileText, Receipt, Wallet, Building2, MapPin, FolderOpen,
-  UserCog, BarChart3, Settings, Clock, PanelLeftClose, PanelLeft, LogOut, X,
+  UserCog, BarChart3, Settings, Clock, PanelLeftClose, PanelLeft, LogOut, X, HardHat,
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { Toaster } from "@/components/toast";
@@ -36,6 +36,7 @@ const SIDEBAR_GROUPS = [
     title: "Delivery",
     items: [
       { href: "/projects", label: "Projects", icon: Building2, module: "projects" },
+      { href: "/workers", label: "Workers", icon: HardHat, module: "workers" },
       { href: "/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },
       { href: "/documents", label: "Documents", icon: FolderOpen, module: "documents" },
     ],

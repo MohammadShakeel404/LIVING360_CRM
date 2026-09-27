@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
-import { Flame, Users, FileText, Receipt, Search } from "lucide-react";
+import { Flame, Users, FileText, Receipt, Search, HardHat } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
@@ -14,7 +14,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
 
   const ci = { contains: q, mode: "insensitive" as const };
   const own = role === "SALES_EXECUTIVE";
-  const [leads, clients, quotations, invoices] = await Promise.all([
+  const [leads, clients, quotations, invoices, workers] = await Promise.all([
     can(role, "leads", "view")
       ? prisma.lead.findMany({ where: { OR: [{ name: ci }, { phone: { contains: q } }, { leadNumber: ci }], ...(own ? { assignedToId: id } : {}) }, take: 10 })
       : [],
@@ -31,6 +31,9 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
     can(role, "invoices", "view")
       ? prisma.invoice.findMany({ where: { OR: [{ invoiceNumber: ci }, { client: { name: ci } }] }, include: { client: { select: { name: true } } }, take: 10 })
       : [],
+    can(role, "workers", "view")
+      ? prisma.worker.findMany({ where: { OR: [{ name: ci }, { phone: { contains: q } }, { workerNumber: ci }, { trade: ci }] }, take: 10 })
+      : [],
   ]);
 
   const groups = [
@@ -38,6 +41,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
     { title: "Clients", icon: Users, rows: clients.map((c) => ({ href: `/clients/${c.id}`, title: c.name, sub: `${c.clientNumber} · ${c.phone}`, status: null })) },
     { title: "Quotations", icon: FileText, rows: quotations.map((x) => ({ href: `/quotations/${x.id}`, title: x.quotationNumber, sub: x.client?.name ?? x.lead?.name ?? "—", status: x.status })) },
     { title: "Invoices", icon: Receipt, rows: invoices.map((x) => ({ href: `/invoices/${x.id}`, title: x.invoiceNumber, sub: x.client.name, status: x.status })) },
+    { title: "Workers", icon: HardHat, rows: workers.map((w) => ({ href: `/workers/${w.id}`, title: w.name, sub: `${w.trade} · ${w.phone}`, status: null })) },
   ].filter((g) => g.rows.length);
 
   return (

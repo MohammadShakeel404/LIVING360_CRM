@@ -362,6 +362,17 @@ as-is for every future export button; don't write a new download handler per mod
   per line, reason, timeline impact (days). Draft → Sent → Client approved / Rejected. Approval adds
   the net amount to `Project.value` and shifts `expectedCompletion`. Approved COS can be invoiced
   (`Invoice.changeOrderId`), capped at the COS net. Maths in `changeOrderTotals` (`src/lib/contracts.ts`).
+- **Workers & labour cost** (`Worker`, `ProjectWorker`, `WorkerStage`, `WorkerPayment`; permission
+  module `workers`) — worker profiles (trade, phone, ID, UPI/bank, usual rate) at `/workers`.
+  A worker is engaged on a project with a scope and pay basis: fixed amount, per day (rate × days)
+  or per unit (rate × sq.ft/r.ft/nos); the payable is stored in `agreedAmount`. Optional stage plan
+  whose amounts must equal the payable. Payments are recorded against a stage or as direct/advance
+  (receipt no. `WP-YYYY-NNNN`), can never exceed the balance, and each has a letterhead receipt PDF
+  (shareable to the worker on WhatsApp). Worker statement PDF, project labour-cost statement PDF
+  (by trade and by worker, % of contract value), Excel export, "Labour due" dashboard card.
+  All maths in `assignmentSummary` / `labourSummary` (`src/lib/workers.ts`, covered by `npm run check`).
+  Site supervisors see who is on site but no amounts; project managers and accountants can pay;
+  only admins delete payments. Workers with history can only be marked inactive, not deleted.
 - **Tasks** — shared `TaskBoard` (tasks page + project page): create/edit/complete/delete.
 - **Site visits** — schedule for a lead or project, reschedule, complete with measurements; moves
   the lead's stage forward automatically.

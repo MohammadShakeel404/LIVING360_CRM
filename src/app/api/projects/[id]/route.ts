@@ -48,6 +48,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const invoices = await prisma.invoice.count({ where: { projectId: params.id } });
   if (invoices) return NextResponse.json({ error: "This project has invoices and can't be deleted." }, { status: 409 });
+  const workerPayments = await prisma.workerPayment.count({ where: { assignment: { projectId: params.id } } });
+  if (workerPayments) return NextResponse.json({ error: "Worker payments are recorded on this project, so it can't be deleted." }, { status: 409 });
   await prisma.$transaction([
     prisma.task.deleteMany({ where: { projectId: params.id } }),
     prisma.siteVisit.deleteMany({ where: { projectId: params.id } }),

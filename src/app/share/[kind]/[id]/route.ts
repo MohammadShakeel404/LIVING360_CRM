@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyShareToken, SHARE_KINDS, type ShareKind } from "@/lib/settings";
 import { quotationPdf, invoicePdf } from "@/lib/documentPdf";
 import { agreementPdf, changeOrderPdf } from "@/lib/contractPdf";
+import { workerReceiptPdf } from "@/lib/workerPdf";
 import { pdfResponseHeaders } from "@/lib/pdf";
 
 const RENDER: Record<ShareKind, (id: string) => Promise<{ buffer: Buffer; filename: string } | null>> = {
@@ -10,6 +11,7 @@ const RENDER: Record<ShareKind, (id: string) => Promise<{ buffer: Buffer; filena
   agreement: (id) => agreementPdf(id, "agreement"),
   workorder: (id) => agreementPdf(id, "workorder"),
   cos: changeOrderPdf,
+  wreceipt: workerReceiptPdf,
 };
 
 /** Public, token-protected PDF link that clients can open from WhatsApp / email without logging in. */

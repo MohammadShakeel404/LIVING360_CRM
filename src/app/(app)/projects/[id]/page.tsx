@@ -16,6 +16,9 @@ import { TaskBoard } from "@/components/TaskBoard";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { ProjectControls } from "./ProjectControls";
 import { AgreementPanel } from "./AgreementPanel";
+import { ProjectLabour } from "./ProjectLabour";
+import { assignmentSummary, labourSummary } from "@/lib/workers";
+import { workerOptions } from "@/lib/workerData";
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -28,6 +31,10 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       client: { select: { id: true, name: true, phone: true, email: true, lead: { select: { whatsapp: true } } } },
       agreements: { include: { quotation: { select: { quotationNumber: true } } }, orderBy: { createdAt: "desc" } },
       changeOrders: { include: { items: true }, orderBy: { createdAt: "desc" } },
+      workers: {
+        include: { worker: { select: { name: true, trade: true } }, stages: { orderBy: { sortOrder: "asc" } }, payments: { select: { amount: true, stageId: true } } },
+        orderBy: { createdAt: "asc" },
+      },
       projectManager: { select: { id: true, name: true } },
       invoices: { include: { payments: { select: { amount: true } } }, orderBy: { invoiceDate: "desc" } },
       siteVisits: { include: { assignedTo: { select: { name: true } } }, orderBy: { scheduledAt: "desc" }, take: 10 },
@@ -52,6 +59,14 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   const agreement = p.agreements.find((a) => a.status !== "CANCELLED") ?? p.agreements[0] ?? null;
   const manageContracts = canManageContracts(role);
   const cosRows = p.changeOrders.map((c) => ({ ...c, t: changeOrderTotals(c.items) }));
+  const seeWorkers = can(role, "workers", "view");
+  const workerMoney = can(role, "workers", "financial");
+  const labourRows = p.workers.map((a) => {
+    const s = assignmentSummary(a);
+    return { id: a.id, workerName: a.worker.name, trade: a.worker.trade, scope: a.scope, status: a.status, payable: s.payable, paid: s.paid, balance: s.balance, stages: s.stages };
+  });
+  const labour = labourSummary(labourRows);
+  const canAssignWorkers = can(role, "workers", "create") && workerMoney;
   const approvedCosNet = cosRows.filter((c) => c.status === "APPROVED").reduce((s, c) => s + c.t.net, 0);
   const late = p.expectedCompletion && p.expectedCompletion < new Date() && p.stage !== "COMPLETED";
 
@@ -149,6 +164,21 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           <div className="md:col-span-2" />
         )}
       </div>
+
+      {seeWorkers && (
+        <Card title="Workers & labour cost" subtitle="Who is working on this project, what they're owed and what's been paid.">
+          <ProjectLabour
+            projectId={p.id}
+            rows={workerMoney ? labourRows : labourRows.map((r) => ({ ...r, payable: 0, paid: 0, balance: 0, stages: [] }))}
+            summary={workerMoney ? labour : { payable: 0, paid: 0, balance: 0, byTrade: [] }}
+            contractValue={financial && p.value ? Number(p.value) : null}
+            financial={workerMoney}
+            canAssign={canAssignWorkers && p.stage !== "COMPLETED"}
+            canPay={canAssignWorkers}
+            workers={canAssignWorkers ? await workerOptions() : []}
+          />
+        </Card>
+      )}
 
       <div>
         <div className="mb-2.5 text-[15px] font-semibold text-ink">Tasks</div>

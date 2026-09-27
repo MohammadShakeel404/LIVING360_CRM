@@ -50,6 +50,7 @@ model User {
   activity            ActivityLog[]
   agreementsCreated   Agreement[]    @relation("AgreementCreator")
   changeOrdersCreated ChangeOrder[]  @relation("ChangeOrderCreator")
+  workerPaymentsRecorded WorkerPayment[] @relation("WorkerPaymentRecorder")
 
   /// Set when an employee is removed; the row is kept so their history stays intact.
   deletedAt           DateTime?
@@ -389,6 +390,7 @@ model Project {
   documents           Document[]
   agreements          Agreement[]
   changeOrders        ChangeOrder[]
+  workers             ProjectWorker[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -623,4 +625,114 @@ model ChangeOrderItem {
   rate          Decimal     @db.Decimal(12, 2)
   gstPct        Decimal     @default(18) @db.Decimal(5, 2)
   sortOrder     Int         @default(0)
+}
+
+// ---------------------------------------------------------------------
+// WORKERS (site workforce: carpenters, POP, painters, labour…) + LABOUR PAYMENTS
+// ---------------------------------------------------------------------
+
+enum WorkerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum WorkerRateType {
+  LUMP_SUM  // fixed amount for the job
+  DAILY     // rate per day × days
+  PER_UNIT  // rate per sq.ft / r.ft / nos × quantity
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  COMPLETED
+}
+
+model Worker {
+  id             String        @id @default(cuid())
+  workerNumber   String        @unique // WRK-0001
+  name           String
+  trade          String        // Carpenter, POP / False ceiling, Painter, Electrician, Labour…
+  phone          String
+  altPhone       String?
+  address        String?
+  idProof        String?       // e.g. "Aadhaar XXXX-1234"
+  bankName       String?
+  accountName    String?
+  accountNumber  String?
+  ifsc           String?
+  upiId          String?
+  defaultRate    Decimal?      @db.Decimal(12, 2)
+  defaultRateType WorkerRateType?
+  notes          String?
+  status         WorkerStatus  @default(ACTIVE)
+
+  assignments    ProjectWorker[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([trade])
+  @@index([status])
+}
+
+/// A worker engaged on a project for a scope of work, with the agreed total payable.
+model ProjectWorker {
+  id            String           @id @default(cuid())
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workerId      String
+  worker        Worker           @relation(fields: [workerId], references: [id])
+
+  scope         String
+  rateType      WorkerRateType   @default(LUMP_SUM)
+  rate          Decimal?         @db.Decimal(12, 2)
+  quantity      Decimal?         @db.Decimal(10, 2)
+  unit          String?
+  /// Total payable for this assignment (rate × quantity, or the lump sum).
+  agreedAmount  Decimal          @db.Decimal(12, 2)
+  status        AssignmentStatus @default(ACTIVE)
+  startDate     DateTime?
+  endDate       DateTime?
+  notes         String?
+
+  stages        WorkerStage[]
+  payments      WorkerPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([workerId])
+}
+
+/// Optional stage-wise payment plan for an assignment (amounts add up to the agreed amount).
+model WorkerStage {
+  id            String        @id @default(cuid())
+  assignmentId  String
+  assignment    ProjectWorker @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  label         String
+  amount        Decimal       @db.Decimal(12, 2)
+  sortOrder     Int           @default(0)
+  payments      WorkerPayment[]
+}
+
+model WorkerPayment {
+  id              String        @id @default(cuid())
+  receiptNumber   String        @unique // WP-2026-0001
+  assignmentId    String
+  assignment      ProjectWorker @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  /// null = direct / advance payment not tied to a stage
+  stageId         String?
+  stage           WorkerStage?  @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  amount          Decimal       @db.Decimal(12, 2)
+  method          PaymentMethod
+  referenceNumber String?
+  notes           String?
+  paidAt          DateTime      @default(now())
+  recordedById    String
+  recordedBy      User          @relation("WorkerPaymentRecorder", fields: [recordedById], references: [id])
+  createdAt       DateTime      @default(now())
+
+  @@index([assignmentId])
+  @@index([paidAt])
 }

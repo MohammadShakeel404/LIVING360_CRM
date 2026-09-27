@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
-import { Flame, Clock, FileText, IndianRupee, AlertTriangle, Building2, ListChecks, Receipt, Plus, ShieldCheck } from "lucide-react";
+import { Flame, Clock, FileText, IndianRupee, AlertTriangle, Building2, ListChecks, Receipt, Plus, ShieldCheck, HardHat } from "lucide-react";
+import { assignmentSummary } from "@/lib/workers";
 import { authOptions } from "@/lib/auth";
 import { MyTasks } from "./MyTasks";
 import { prisma } from "@/lib/prisma";
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
   const seeMoney = can(role, "reports", "financial") || can(role, "invoices", "financial");
   const seeProjects = can(role, "projects", "view");
   const seeTasks = can(role, "tasks", "view");
+  const seeLabour = can(role, "workers", "view") && can(role, "workers", "financial");
 
   const [hotLeads, activeLeads, overdueLeads, todayFollowUps, sentQuotes, approvals, paidThisMonth, openInvoices, activeProjects, myTasks] = await Promise.all([
     seeLeads ? prisma.lead.count({ where: { ...leadScope, score: "HOT", stage: { notIn: ["CONVERTED", "LOST"] } } }) : 0,
@@ -39,6 +41,10 @@ export default async function DashboardPage() {
     seeTasks ? prisma.task.findMany({ where: { assigneeId: id, status: { not: "COMPLETED" } }, include: { project: { select: { projectNumber: true } } }, orderBy: [{ dueDate: "asc" }], take: 5 }) : [],
   ]);
 
+  const labourRows = seeLabour
+    ? await prisma.projectWorker.findMany({ where: { project: { stage: { not: "COMPLETED" } } }, select: { agreedAmount: true, payments: { select: { amount: true, stageId: true } } } })
+    : [];
+  const labourDue = labourRows.reduce((s, a) => s + assignmentSummary(a).balance, 0);
   const outstanding = openInvoices.reduce((s, i) => s + Number(i.totalAmount) - i.payments.reduce((a, p) => a + Number(p.amount), 0), 0);
   const overdueInvoices = openInvoices.filter((i) => i.dueDate && i.dueDate < startOfToday).length;
   const hour = new Date().getHours();
@@ -71,6 +77,7 @@ export default async function DashboardPage() {
         {seeQuotes && <StatCard label="Awaiting client" value={sentQuotes} sub="Quotations sent" subTone="text-primary" icon={FileText} href="/quotations?status=SENT" />}
         {seeMoney && <StatCard label="Collected this month" value={formatCurrency(paidThisMonth?._sum.amount?.toString() ?? 0)} sub="Payments received" subTone="text-success" icon={IndianRupee} href="/payments" />}
         {seeMoney && <StatCard label="Outstanding" value={formatCurrency(outstanding)} sub={`${overdueInvoices} invoice${overdueInvoices === 1 ? "" : "s"} overdue`} subTone={overdueInvoices ? "text-danger" : "text-ink-soft"} icon={Receipt} href="/invoices?status=UNPAID" />}
+        {seeLabour && <StatCard label="Labour due" value={formatCurrency(labourDue)} sub={`${labourRows.filter((a) => assignmentSummary(a).balance > 0.5).length} workers to pay`} subTone={labourDue > 0.5 ? "text-warning" : "text-success"} icon={HardHat} href="/workers" />}
         {seeProjects && <StatCard label="Active projects" value={activeProjects} sub="In progress" subTone="text-primary" icon={Building2} href="/projects" />}
         {seeTasks && <StatCard label="My open tasks" value={myTasks.length} sub="Assigned to you" icon={ListChecks} href="/tasks" />}
       </div>

@@ -70,7 +70,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     where: { id: params.id },
     select: {
       id: true, name: true, role: true, deletedAt: true,
-      _count: { select: { followUps: true, quotationsCreated: true, documentsUploaded: true, activity: true, agreementsCreated: true, changeOrdersCreated: true } },
+      _count: { select: { followUps: true, quotationsCreated: true, documentsUploaded: true, activity: true, agreementsCreated: true, changeOrdersCreated: true, workerPaymentsRecorded: true } },
     },
   });
   if (!target || target.deletedAt) return NextResponse.json({ error: "Not found" }, { status: 404 });

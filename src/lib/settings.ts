@@ -12,8 +12,8 @@ export type CompanySettingsRow = Awaited<ReturnType<typeof getCompanySettings>>;
 // ---- Public share links for PDFs ------------------------------------------
 // ponytail: stateless HMAC links — no per-link revocation; rotate NEXTAUTH_SECRET to revoke all.
 
-export type ShareKind = "quotation" | "invoice" | "agreement" | "workorder" | "cos";
-export const SHARE_KINDS: ShareKind[] = ["quotation", "invoice", "agreement", "workorder", "cos"];
+export type ShareKind = "quotation" | "invoice" | "agreement" | "workorder" | "cos" | "wreceipt";
+export const SHARE_KINDS: ShareKind[] = ["quotation", "invoice", "agreement", "workorder", "cos", "wreceipt"];
 
 function sign(kind: ShareKind, id: string) {
   const secret = process.env.NEXTAUTH_SECRET;

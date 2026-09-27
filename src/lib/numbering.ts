@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 
-type NumberedModel = "lead" | "client" | "quotation" | "invoice" | "project" | "agreement" | "changeOrder";
+type NumberedModel = "lead" | "client" | "quotation" | "invoice" | "project" | "agreement" | "changeOrder" | "worker" | "workerPayment";
 const FIELD: Record<NumberedModel, string> = {
   lead: "leadNumber", client: "clientNumber", quotation: "quotationNumber", invoice: "invoiceNumber", project: "projectNumber",
-  agreement: "agreementNumber", changeOrder: "cosNumber",
+  agreement: "agreementNumber", changeOrder: "cosNumber", worker: "workerNumber", workerPayment: "receiptNumber",
 };
 
 /**

@@ -14,7 +14,8 @@ export type Module =
   | "documents"
   | "employees"
   | "reports"
-  | "settings";
+  | "settings"
+  | "workers";
 
 export type Action = "view" | "create" | "edit" | "delete" | "export" | "financial";
 
@@ -33,7 +34,7 @@ function full(overrides: Partial<Record<Module, Partial<ModulePermissions>>> = {
   const modules: Module[] = [
     "dashboard", "leads", "followups", "clients", "quotations", "invoices",
     "payments", "projects", "tasks", "sitevisits", "documents", "employees",
-    "reports", "settings",
+    "reports", "settings", "workers",
   ];
   const base = Object.fromEntries(modules.map((m) => [m, { ...NONE }])) as PermissionMatrix;
   for (const m of modules) base[m] = { ...NONE, ...(overrides[m] ?? {}) };
@@ -58,7 +59,7 @@ export const PERMISSIONS: Record<RoleName, PermissionMatrix> = {
     dashboard: ALL_TRUE, leads: ALL_TRUE, followups: ALL_TRUE, clients: ALL_TRUE,
     quotations: ALL_TRUE, invoices: ALL_TRUE, payments: ALL_TRUE, projects: ALL_TRUE,
     tasks: ALL_TRUE, sitevisits: ALL_TRUE, documents: ALL_TRUE, employees: ALL_TRUE,
-    reports: ALL_TRUE, settings: ALL_TRUE,
+    reports: ALL_TRUE, settings: ALL_TRUE, workers: ALL_TRUE,
   }),
 
   ADMIN: full({
@@ -67,6 +68,7 @@ export const PERMISSIONS: Record<RoleName, PermissionMatrix> = {
     tasks: ALL_TRUE, sitevisits: ALL_TRUE, documents: ALL_TRUE,
     employees: { view: true, create: true, edit: true, delete: false, export: true, financial: false },
     reports: ALL_TRUE, settings: { view: true, create: false, edit: true, delete: false, export: false, financial: false },
+    workers: ALL_TRUE,
   }),
 
   SALES_MANAGER: full({
@@ -108,6 +110,7 @@ export const PERMISSIONS: Record<RoleName, PermissionMatrix> = {
     sitevisits: { view: true, create: true, edit: true, delete: false, export: false, financial: false },
     documents: { view: true, create: true, edit: true, delete: false, export: false, financial: false },
     invoices: VIEW_ONLY,
+    workers: { view: true, create: true, edit: true, delete: false, export: true, financial: true },
   }),
 
   SITE_SUPERVISOR: full({
@@ -116,6 +119,7 @@ export const PERMISSIONS: Record<RoleName, PermissionMatrix> = {
     tasks: { view: true, create: false, edit: true, delete: false, export: false, financial: false },
     sitevisits: { view: true, create: true, edit: true, delete: false, export: false, financial: false },
     documents: { view: true, create: true, edit: false, delete: false, export: false, financial: false },
+    workers: VIEW_ONLY,
   }),
 
   ACCOUNTANT: full({
@@ -124,6 +128,7 @@ export const PERMISSIONS: Record<RoleName, PermissionMatrix> = {
     invoices: { view: true, create: true, edit: true, delete: false, export: true, financial: true },
     payments: { view: true, create: true, edit: true, delete: false, export: true, financial: true },
     reports: { ...VIEW_ONLY, export: true, financial: true },
+    workers: { view: true, create: true, edit: true, delete: false, export: true, financial: true },
   }),
 
   VIEWER: full({
