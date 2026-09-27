@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { can, DISCOUNT_LIMITS } from "@/lib/permissions";
 import { getCompanySettings } from "@/lib/settings";
 import { EmptyState } from "@/components/ui";
+import { loadCatalog } from "@/lib/catalogData";
 import { QuotationEditor } from "../QuotationEditor";
 
 export default async function NewQuotationPage({ searchParams }: { searchParams: { leadId?: string; clientId?: string } }) {
@@ -40,6 +41,7 @@ export default async function NewQuotationPage({ searchParams }: { searchParams:
       leads={leads}
       clients={clients}
       discountLimit={DISCOUNT_LIMITS[role]}
+      catalog={await loadCatalog()}
     />
   );
 }

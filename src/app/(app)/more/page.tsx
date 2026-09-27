@@ -23,7 +23,7 @@ export default async function MorePage() {
       </div>
       <div className="grid grid-cols-3 gap-3">
         {modules.map((m) => (
-          <Link key={m.id} href={`/${m.id}`} className="flex flex-col items-center gap-2 rounded-xl2 border border-line bg-white px-2 py-4 active:scale-[0.97]">
+          <Link key={m.href ?? m.id} href={m.href ?? `/${m.id}`} className="flex flex-col items-center gap-2 rounded-xl2 border border-line bg-white px-2 py-4 active:scale-[0.97]">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><m.icon size={19} className="text-primary" /></div>
             <span className="text-center text-xs font-semibold text-ink">{m.title}</span>
           </Link>

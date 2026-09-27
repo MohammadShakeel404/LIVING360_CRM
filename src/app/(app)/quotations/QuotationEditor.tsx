@@ -2,16 +2,21 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Copy, Loader2, AlertTriangle, GripVertical } from "lucide-react";
+import { Plus, Trash2, Copy, Loader2, AlertTriangle, GripVertical, BookOpen, List } from "lucide-react";
 import { Card, Field, PageHeader, inputCls, btn, formatCurrency } from "@/components/ui";
 import { toast } from "@/components/toast";
 import { quotationTotals, lineNet } from "@/lib/totals";
+import type { CatalogForEditor } from "@/lib/catalog";
+import { PriceListPicker } from "./PriceListPicker";
 
 const CATEGORIES = ["Living Room", "Master Bedroom", "Bedroom 2", "Kids Room", "Modular Kitchen", "Wardrobe", "False Ceiling", "Electrical", "Painting", "Flooring", "Bathroom", "Furniture", "Miscellaneous"];
 const UNITS = ["Sq.ft", "R.ft", "Nos", "Set", "Lot", "Lump Sum"];
+const CUSTOM = "__custom";
 
 export type EditorItem = {
   category: string; name: string; description: string; quantity: string; unit: string; rate: string; discountPct: string; gstPct: string;
+  /** UI only: typed category / item instead of picking from the price list; list rate for comparison. */
+  customCategory?: boolean; customItem?: boolean; listRate?: number;
 };
 export type EditorInitial = {
   id?: string;
@@ -29,9 +34,10 @@ const emptyItem = (category = CATEGORIES[0]): EditorItem => ({
 const toNum = (v: string, fallback = 0) => (v.trim() === "" || Number.isNaN(Number(v)) ? fallback : Number(v));
 
 export function QuotationEditor({
-  initial, leads, clients, discountLimit, lockedParty,
+  initial, leads, clients, discountLimit, lockedParty, catalog = [],
 }: {
   initial: EditorInitial;
+  catalog?: CatalogForEditor;
   leads: { id: string; name: string; leadNumber: string }[];
   clients: { id: string; name: string; clientNumber: string }[];
   discountLimit: number;
@@ -39,7 +45,10 @@ export function QuotationEditor({
 }) {
   const router = useRouter();
   const [f, setF] = useState(initial);
-  const [items, setItems] = useState<EditorItem[]>(initial.items.length ? initial.items : [emptyItem()]);
+  const firstCategory = catalog[0]?.name ?? CATEGORIES[0];
+  const [items, setItems] = useState<EditorItem[]>(initial.items.length ? initial.items.map((i) => withListRate(i, catalog)) : [emptyItem(firstCategory)]);
+  const [picking, setPicking] = useState(false);
+  const catNames = catalog.map((c) => c.name);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
   const editing = !!initial.id;
@@ -57,6 +66,23 @@ export function QuotationEditor({
   ].filter(Boolean) as string[];
 
   const upd = (idx: number, k: keyof EditorItem, v: string) => setItems((xs) => xs.map((x, i) => (i === idx ? { ...x, [k]: v } : x)));
+  const patch = (idx: number, p: Partial<EditorItem>) => setItems((xs) => xs.map((x, i) => (i === idx ? { ...x, ...p } : x)));
+
+  function pickCategory(idx: number, v: string) {
+    if (v === CUSTOM) return patch(idx, { customCategory: true, category: "", customItem: true, listRate: undefined });
+    patch(idx, { category: v, customCategory: false, customItem: false, name: "", description: "", rate: "", listRate: undefined });
+  }
+  function pickItem(idx: number, v: string) {
+    if (v === CUSTOM) return patch(idx, { customItem: true, name: "", listRate: undefined });
+    const ci = catalog.find((c) => c.name === items[idx].category)?.items.find((x) => x.id === v);
+    if (ci) patch(idx, { name: ci.name, description: ci.description ?? "", unit: ci.unit, rate: String(ci.rate), gstPct: String(ci.gstPct), listRate: ci.rate, customItem: false });
+  }
+  function addFromList(picked: EditorItem[]) {
+    setItems((xs) => {
+      const blank = xs.length === 1 && !xs[0].name.trim() && !xs[0].rate.trim();
+      return [...(blank ? [] : xs), ...picked];
+    });
+  }
   const move = (idx: number, dir: -1 | 1) =>
     setItems((xs) => {
       const j = idx + dir;
@@ -149,7 +175,12 @@ export function QuotationEditor({
 
       <Card
         title={`Line items (${items.length})`}
-        action={<button type="button" onClick={() => setItems((xs) => [...xs, emptyItem(xs[xs.length - 1]?.category)])} className={btn.ghost}><Plus size={14} /> Add item</button>}
+        action={
+          <div className="flex gap-2">
+            {catalog.length > 0 && <button type="button" onClick={() => setPicking(true)} className={btn.secondary}><BookOpen size={14} /> Add from price list</button>}
+            <button type="button" onClick={() => setItems((xs) => [...xs, emptyItem(xs[xs.length - 1]?.category ?? firstCategory)])} className={btn.ghost}><Plus size={14} /> Add item</button>
+          </div>
+        }
       >
         <datalist id="qt-categories">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
         <div className="flex flex-col gap-3">
@@ -175,14 +206,20 @@ export function QuotationEditor({
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-12">
-                  <Field label="Room / category" className="md:col-span-3"><input list="qt-categories" className={inputCls} value={it.category} onChange={(e) => upd(idx, "category", e.target.value)} /></Field>
-                  <Field label="Item *" className="md:col-span-4"><input className={inputCls} value={it.name} placeholder="e.g. TV unit with back panel" onChange={(e) => upd(idx, "name", e.target.value)} /></Field>
+                  <CategoryField it={it} catNames={catNames} onPick={(v) => pickCategory(idx, v)} onType={(v) => upd(idx, "category", v)} onBackToList={() => pickCategory(idx, catNames[0])} />
+                  <ItemField it={it} catalog={catalog} onPick={(v) => pickItem(idx, v)} onType={(v) => upd(idx, "name", v)} onBackToList={() => patch(idx, { customItem: false, name: "" })} />
                   <Field label="Specification" className="col-span-2 md:col-span-5"><input className={inputCls} value={it.description} placeholder="Material, finish, brand…" onChange={(e) => upd(idx, "description", e.target.value)} /></Field>
                   <Field label="Qty *" className="md:col-span-2"><input type="number" min={0} step="any" className={inputCls} value={it.quantity} onChange={(e) => upd(idx, "quantity", e.target.value)} /></Field>
                   <Field label="Unit" className="md:col-span-2">
-                    <select className={inputCls} value={it.unit} onChange={(e) => upd(idx, "unit", e.target.value)}>{UNITS.map((u) => <option key={u}>{u}</option>)}</select>
+                    <select className={inputCls} value={it.unit} onChange={(e) => upd(idx, "unit", e.target.value)}>{[...new Set([...UNITS, it.unit])].map((u) => <option key={u}>{u}</option>)}</select>
                   </Field>
-                  <Field label="Rate (₹) *" className="md:col-span-3"><input type="number" min={0} step="any" className={inputCls} value={it.rate} placeholder="0" onChange={(e) => upd(idx, "rate", e.target.value)} /></Field>
+                  <Field
+                    label="Rate (₹) *"
+                    className="md:col-span-3"
+                    hint={it.listRate !== undefined && toNum(it.rate) !== it.listRate ? `List price ${formatCurrency(it.listRate)} — edited` : it.listRate !== undefined ? "From price list" : undefined}
+                  >
+                    <input type="number" min={0} step="any" className={inputCls} value={it.rate} placeholder="0" onChange={(e) => upd(idx, "rate", e.target.value)} />
+                  </Field>
                   <Field label="Disc %" className="md:col-span-2"><input type="number" min={0} max={100} step="0.5" className={inputCls} value={it.discountPct} onChange={(e) => upd(idx, "discountPct", e.target.value)} /></Field>
                   <Field label="GST %" className="md:col-span-3">
                     <select className={inputCls} value={it.gstPct} onChange={(e) => upd(idx, "gstPct", e.target.value)}>{["0", "5", "12", "18", "28"].map((g) => <option key={g} value={g}>{g}%</option>)}</select>
@@ -216,6 +253,8 @@ export function QuotationEditor({
         </Card>
       </div>
 
+      {picking && <PriceListPicker catalog={catalog} onClose={() => setPicking(false)} onAdd={(picked) => { addFromList(picked); setPicking(false); }} />}
+
       <div className="sticky bottom-[-50px] z-30 -mx-4 rounded-t-xl2 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-6px_20px_rgba(37,26,81,0.06)] backdrop-blur md:bottom-[-40px] md:-mx-6 md:px-6">
         <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-3">
           <div>
@@ -240,5 +279,57 @@ function Row({ label, value }: { label: string; value: number }) {
       <span>{label}</span>
       <span className="font-medium text-ink">{value < 0 ? "− " + formatCurrency(-value) : formatCurrency(value)}</span>
     </div>
+  );
+}
+
+/** Carries the price-list rate on existing lines so edits show "List price … — edited". */
+function withListRate(i: EditorItem, catalog: CatalogForEditor): EditorItem {
+  const cat = catalog.find((c) => c.name === i.category);
+  const ci = cat?.items.find((x) => x.name === i.name);
+  return { ...i, customCategory: catalog.length > 0 && !cat, customItem: !ci, listRate: ci?.rate };
+}
+
+function CategoryField({ it, catNames, onPick, onType, onBackToList }: { it: EditorItem; catNames: string[]; onPick: (v: string) => void; onType: (v: string) => void; onBackToList: () => void }) {
+  if (!catNames.length || it.customCategory) {
+    return (
+      <Field label="Room / category" className="md:col-span-3" hint={catNames.length ? undefined : "Tip: an admin can set up the price list for dropdowns."}>
+        <div className="flex gap-1">
+          <input list="qt-categories" className={inputCls} value={it.category} placeholder="e.g. Pooja room" onChange={(e) => onType(e.target.value)} />
+          {catNames.length > 0 && <button type="button" title="Choose from price list" aria-label="Choose category from price list" onClick={onBackToList} className="flex-shrink-0 rounded-[10px] px-2 text-primary hover:bg-white"><List size={16} /></button>}
+        </div>
+      </Field>
+    );
+  }
+  return (
+    <Field label="Category" className="md:col-span-3">
+      <select className={inputCls} value={it.category} onChange={(e) => onPick(e.target.value)}>
+        {catNames.map((c) => <option key={c} value={c}>{c}</option>)}
+        <option value={CUSTOM}>✎ Other (type a name)…</option>
+      </select>
+    </Field>
+  );
+}
+
+function ItemField({ it, catalog, onPick, onType, onBackToList }: { it: EditorItem; catalog: CatalogForEditor; onPick: (v: string) => void; onType: (v: string) => void; onBackToList: () => void }) {
+  const list = catalog.find((c) => c.name === it.category)?.items ?? [];
+  if (!list.length || it.customItem) {
+    return (
+      <Field label="Item *" className="md:col-span-4">
+        <div className="flex gap-1">
+          <input className={inputCls} value={it.name} placeholder="e.g. TV unit with back panel" onChange={(e) => onType(e.target.value)} />
+          {list.length > 0 && <button type="button" title="Choose from price list" aria-label="Choose item from price list" onClick={onBackToList} className="flex-shrink-0 rounded-[10px] px-2 text-primary hover:bg-white"><List size={16} /></button>}
+        </div>
+      </Field>
+    );
+  }
+  const selected = list.find((x) => x.name === it.name);
+  return (
+    <Field label="Item *" className="md:col-span-4">
+      <select className={inputCls} value={selected?.id ?? ""} onChange={(e) => onPick(e.target.value)}>
+        <option value="" disabled>— Select item —</option>
+        {list.map((x) => <option key={x.id} value={x.id}>{x.name} · ₹{x.rate.toLocaleString("en-IN")}/{x.unit}</option>)}
+        <option value={CUSTOM}>✎ Custom item (type)…</option>
+      </select>
+    </Field>
   );
 }

@@ -10,7 +10,7 @@ type Ask = {
   confirmLabel?: string;
   danger?: boolean;
   /** Show a text field; its value is returned on confirm. */
-  input?: { label: string; placeholder?: string };
+  input?: { label: string; placeholder?: string; defaultValue?: string };
 };
 type Pending = Ask & { resolve: (v: string | null) => void };
 
@@ -33,7 +33,7 @@ export function ConfirmHost() {
   const okRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    open = (next) => { setValue(""); setP(next); };
+    open = (next) => { setValue(next.input?.defaultValue ?? ""); setP(next); };
     return () => { open = null; };
   }, []);
   useEffect(() => {

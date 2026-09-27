@@ -362,6 +362,13 @@ as-is for every future export button; don't write a new download handler per mod
   per line, reason, timeline impact (days). Draft → Sent → Client approved / Rejected. Approval adds
   the net amount to `Project.value` and shifts `expectedCompletion`. Approved COS can be invoiced
   (`Invoice.changeOrderId`), capped at the COS net. Maths in `changeOrderTotals` (`src/lib/contracts.ts`).
+- **Price list** (`CatalogCategory`, `CatalogItem`; page `/pricelist`) — Super Admin / Admin manage
+  categories (add, rename, reorder, hide, delete when empty) and items (spec, unit, rate, GST, hide,
+  delete); one-click starter list (`STARTER_CATALOG` in `src/lib/catalog.ts`, also seeded). In the
+  quotation editor each line has Category and Item dropdowns fed by the active price list; picking
+  an item fills spec/unit/rate/GST, the rate stays editable (UI flags "List price … — edited"), and
+  "✎ Other / Custom" allows free typing. "Add from price list" adds several items at once.
+  Quotation lines copy the values, so price changes never alter existing quotations.
 - **Workers & labour cost** (`Worker`, `ProjectWorker`, `WorkerStage`, `WorkerPayment`; permission
   module `workers`) — worker profiles (trade, phone, ID, UPI/bank, usual rate) at `/workers`.
   A worker is engaged on a project with a scope and pay basis: fixed amount, per day (rate × days)

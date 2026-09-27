@@ -1,13 +1,14 @@
-import { HardHat, Clock, Users, MapPin, FileText, Receipt, Wallet, Building2, ListChecks, FolderOpen, UserCog, BarChart3, Settings, Flame, LucideIcon } from "lucide-react";
+import { BookOpen, HardHat, Clock, Users, MapPin, FileText, Receipt, Wallet, Building2, ListChecks, FolderOpen, UserCog, BarChart3, Settings, Flame, LucideIcon } from "lucide-react";
 import type { Module } from "@/lib/permissions";
 
 /** Modules listed on the mobile "More" screen, in display order. */
-export const MORE_MODULES: { id: Module; icon: LucideIcon; title: string }[] = [
+export const MORE_MODULES: { id: Module; icon: LucideIcon; title: string; href?: string }[] = [
   { id: "leads", icon: Flame, title: "Leads" },
   { id: "followups", icon: Clock, title: "Follow-ups" },
   { id: "clients", icon: Users, title: "Clients" },
   { id: "sitevisits", icon: MapPin, title: "Site Visits" },
   { id: "quotations", icon: FileText, title: "Quotations" },
+  { id: "quotations", icon: BookOpen, title: "Price list", href: "/pricelist" },
   { id: "invoices", icon: Receipt, title: "Invoices" },
   { id: "payments", icon: Wallet, title: "Payments" },
   { id: "projects", icon: Building2, title: "Projects" },

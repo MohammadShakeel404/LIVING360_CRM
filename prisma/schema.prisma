@@ -736,3 +736,36 @@ model WorkerPayment {
   @@index([assignmentId])
   @@index([paidAt])
 }
+
+// ---------------------------------------------------------------------
+// PRICE LIST (catalog) — categories and standard items used to build quotations.
+// Quotation lines copy the values, so later price changes never alter old quotations.
+// ---------------------------------------------------------------------
+
+model CatalogCategory {
+  id         String        @id @default(cuid())
+  name       String        @unique
+  sortOrder  Int           @default(0)
+  active     Boolean       @default(true)
+  items      CatalogItem[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model CatalogItem {
+  id          String          @id @default(cuid())
+  categoryId  String
+  category    CatalogCategory @relation(fields: [categoryId], references: [id])
+  name        String
+  description String?
+  unit        String
+  rate        Decimal         @db.Decimal(12, 2)
+  gstPct      Decimal         @default(18) @db.Decimal(5, 2)
+  active      Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+}

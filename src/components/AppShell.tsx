@@ -7,7 +7,7 @@ import { signOut } from "next-auth/react";
 import {
   Home, Flame, Users, ListChecks, MoreHorizontal, Plus, Search, Bell,
   ChevronDown, FileText, Receipt, Wallet, Building2, MapPin, FolderOpen,
-  UserCog, BarChart3, Settings, Clock, PanelLeftClose, PanelLeft, LogOut, X, HardHat,
+  UserCog, BarChart3, Settings, Clock, PanelLeftClose, PanelLeft, LogOut, X, HardHat, BookOpen,
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { Toaster } from "@/components/toast";
@@ -28,6 +28,7 @@ const SIDEBAR_GROUPS = [
     title: "Business",
     items: [
       { href: "/quotations", label: "Quotations", icon: FileText, module: "quotations" },
+      { href: "/pricelist", label: "Price list", icon: BookOpen, module: "quotations" },
       { href: "/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
       { href: "/payments", label: "Payments", icon: Wallet, module: "payments" },
     ],

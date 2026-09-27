@@ -1,5 +1,6 @@
 import { PrismaClient, RoleName, LeadSource, LeadStage, LeadScore, FollowUpType, TaskPriority, TaskStatus, ProjectStage } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { STARTER_CATALOG } from "../src/lib/catalog";
 
 const prisma = new PrismaClient();
 
@@ -89,6 +90,15 @@ async function main() {
       invoiceTerms: "Payment due by the date shown above.\nPlease quote the invoice number with your payment.",
     },
   });
+
+  // Starter price list for the quotation editor (only if empty).
+  if (!(await prisma.catalogCategory.count())) {
+    for (const [i, c] of STARTER_CATALOG.entries()) {
+      await prisma.catalogCategory.create({
+        data: { name: c.category, sortOrder: i, items: { create: c.items.map(([name, unit, rate, description], k) => ({ name, unit, rate, description: description ?? null, sortOrder: k })) } },
+      });
+    }
+  }
 
   console.log(`Seeded ${users.length} users, ${createdLeads.length} leads, 1 client/project.`);
   console.log(`Demo login: superadmin@living360.in / ${DEMO_PASSWORD}`);

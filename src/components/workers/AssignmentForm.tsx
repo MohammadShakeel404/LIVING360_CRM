@@ -150,11 +150,11 @@ export function AssignmentForm({
           {staged && (
             <div className="mt-3 flex flex-col gap-2">
               {f.stages.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className="grid grid-cols-[18px_minmax(0,1fr)_36px] items-center gap-x-2 gap-y-1.5 border-b border-line-soft pb-2.5 md:border-0 md:pb-0 md:grid-cols-[18px_minmax(0,1fr)_140px_36px]">
                   <span className="w-5 text-right text-[12px] font-semibold text-ink-faint">{i + 1}.</span>
-                  <input className={inputCls + " flex-1"} value={s.label} onChange={(e) => updStage(i, "label", e.target.value)} placeholder="Stage name" aria-label={`Stage ${i + 1} name`} />
-                  <input type="number" min={0} className={inputCls + " w-[130px]"} value={s.amount} onChange={(e) => updStage(i, "amount", e.target.value)} placeholder="₹" aria-label={`Stage ${i + 1} amount`} />
-                  <button type="button" aria-label="Remove stage" disabled={f.stages.length === 1} onClick={() => setF((p) => ({ ...p, stages: p.stages.filter((_, j) => j !== i) }))} className="rounded-md p-2 text-ink-faint hover:bg-danger-bg hover:text-danger disabled:opacity-30"><Trash2 size={15} /></button>
+                  <input className={inputCls} value={s.label} onChange={(e) => updStage(i, "label", e.target.value)} placeholder="Stage name" aria-label={`Stage ${i + 1} name`} />
+                  <input type="number" min={0} className={inputCls + " col-start-2 row-start-2 text-right md:col-start-3 md:row-start-1"} value={s.amount} onChange={(e) => updStage(i, "amount", e.target.value)} placeholder="Amount ₹" aria-label={`Stage ${i + 1} amount`} />
+                  <button type="button" aria-label="Remove stage" disabled={f.stages.length === 1} onClick={() => setF((p) => ({ ...p, stages: p.stages.filter((_, j) => j !== i) }))} className="col-start-3 row-start-1 rounded-md p-2 text-ink-faint md:col-start-4 hover:bg-danger-bg hover:text-danger disabled:opacity-30"><Trash2 size={15} /></button>
                 </div>
               ))}
               <div className="flex items-center justify-between pl-7">

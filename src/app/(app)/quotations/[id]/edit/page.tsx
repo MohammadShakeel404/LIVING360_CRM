@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can, DISCOUNT_LIMITS } from "@/lib/permissions";
 import { EmptyState } from "@/components/ui";
+import { loadCatalog } from "@/lib/catalogData";
 import { QuotationEditor } from "../../QuotationEditor";
 
 export default async function EditQuotationPage({ params }: { params: { id: string } }) {
@@ -38,6 +39,7 @@ export default async function EditQuotationPage({ params }: { params: { id: stri
       leads={[]}
       clients={[]}
       discountLimit={DISCOUNT_LIMITS[role]}
+      catalog={await loadCatalog()}
     />
   );
 }
