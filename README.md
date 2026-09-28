@@ -26,8 +26,6 @@ npm run check             # money-math self-check
 npm run dev
 ```
 
-Demo login after seeding: `superadmin@living360.in` / `Living360Demo!` — for local development only.
-
 ## Going live (production checklist)
 
 1. **Database** — a managed Postgres (Neon, Supabase, RDS…). Take automatic daily backups; uploaded
