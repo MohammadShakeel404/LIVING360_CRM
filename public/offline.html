@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Living 360 — offline</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #F6F5FB; color: #1D1730; font-family: system-ui, sans-serif; text-align: center; padding: 24px; }
+    .tile { width: 56px; height: 56px; border-radius: 14px; background: #FEB73F; color: #251A51; font-weight: 800; font-size: 26px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+    button { margin-top: 20px; background: #523AB7; color: #fff; border: 0; border-radius: 10px; padding: 12px 20px; font-size: 15px; font-weight: 600; }
+    p { color: #6B6480; max-width: 300px; margin: 6px auto 0; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="tile">L</div>
+    <h2 style="margin:0">You're offline</h2>
+    <p>Living 360 needs an internet connection. Check your mobile data or Wi-Fi and try again.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

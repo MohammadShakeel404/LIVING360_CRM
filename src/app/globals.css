@@ -1,0 +1,63 @@
+@import url("https://fonts.googleapis.com/css2?family=Afacad:wght@400;500;600;700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --l360-primary: #523ab7;
+  --l360-primary-deep: #432f9c;
+  --l360-gold: #feb73f;
+  --l360-dark: #251a51;
+  --l360-bg: #f6f5fb;
+  --l360-surface: #ffffff;
+  --l360-ink: #1d1730;
+  --l360-ink-soft: #6b6480;
+  --l360-ink-faint: #9791ac;
+  --l360-line: #e8e4f2;
+  --l360-line-soft: #f0edf7;
+  --l360-success: #1f9d66;
+  --l360-success-bg: #e8f6ef;
+  --l360-warning: #e8873d;
+  --l360-warning-bg: #fdf0e4;
+  --l360-error: #d64545;
+  --l360-error-bg: #fbeaea;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--l360-bg);
+  color: var(--l360-ink);
+  font-family: "Afacad", ui-sans-serif, system-ui, sans-serif;
+}
+
+input,
+select,
+button {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--l360-line);
+  border-radius: 3px;
+}
+
+@keyframes l360SlideUp {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
