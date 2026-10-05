@@ -6,7 +6,10 @@ const nextConfig = {
     // react-pdf ships its own React reconciler + fontkit; bundling it breaks font loading.
     serverComponentsExternalPackages: ["@react-pdf/renderer"],
     // PDF fonts are read from disk at runtime, so make sure Vercel ships them with every function.
-    outputFileTracingIncludes: { "/**": ["./src/assets/fonts/**"] },
+    // pdfkit (inside react-pdf) loads its built-in fonts/data with dynamic paths the tracer can't see.
+    outputFileTracingIncludes: {
+      "/**": ["./src/assets/fonts/**", "./node_modules/pdfkit/js/standard-fonts/**", "./node_modules/pdfkit/js/data/**"],
+    },
   },
   async headers() {
     return [
