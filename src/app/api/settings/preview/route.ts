@@ -42,3 +42,6 @@ export async function GET() {
   );
   return new NextResponse(buffer as any, { headers: pdfResponseHeaders("letterhead-preview.pdf", true) });
 }
+
+// PDF rendering + a cold database can exceed the 10 s default on Vercel.
+export const maxDuration = 60;

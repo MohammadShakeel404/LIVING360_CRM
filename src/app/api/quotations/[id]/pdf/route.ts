@@ -24,3 +24,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const inline = req.nextUrl.searchParams.get("inline") === "1";
   return new NextResponse(pdf.buffer as any, { headers: pdfResponseHeaders(pdf.filename, inline) });
 }
+
+// PDF rendering + a cold database can exceed the 10 s default on Vercel.
+export const maxDuration = 60;

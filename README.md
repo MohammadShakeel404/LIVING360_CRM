@@ -62,3 +62,7 @@ Supervisor, Accountant, Viewer. The matrix and the discount-approval ceilings li
 `src/lib/permissions.ts`; every page and API route reads from it. Agreements, work orders and
 changes of scope can be prepared by roles that can edit projects with financial access
 (Super Admin, Admin, Project Manager). Only a Super Admin can delete employees.
+
+postgresql://neondb_owner:npg_XRNQ14iuEzLT@ep-lucky-truth-b36wmquw.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+
+Dw/q00Yi5ay3e1urcnaWznNwyEaeHQzOd+5W7FhOGZY=

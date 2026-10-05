@@ -24,3 +24,6 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
   if (!pdf) return new NextResponse("Document not found.", { status: 404 });
   return new NextResponse(pdf.buffer as any, { headers: pdfResponseHeaders(pdf.filename, req.nextUrl.searchParams.get("dl") !== "1") });
 }
+
+// PDF rendering + a cold database can exceed the 10 s default on Vercel.
+export const maxDuration = 60;

@@ -21,6 +21,12 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e.message);
+  const msg = String(e?.message ?? e);
+  const hint =
+    /does not exist/i.test(msg) ? "The database tables aren't created yet. Run:  npx prisma migrate deploy  (with the same DATABASE_URL), then try again." :
+    /Can't reach database|P1001|ENOTFOUND|timed out/i.test(msg) ? "Can't connect to the database. Check the DATABASE_URL link (copy it again from Neon with connection pooling OFF)." :
+    /authentication failed|password authentication/i.test(msg) ? "The database username/password in DATABASE_URL is wrong. Copy the link again from Neon." :
+    null;
+  console.error(hint ? `\n❌ ${hint}\n` : msg);
   process.exit(1);
 });

@@ -1,4 +1,7 @@
-export { default } from "next-auth/middleware";
+import { withAuth } from "next-auth/middleware";
+
+// Send signed-out visitors (including expired sessions opening a PDF link) to our own login page.
+export default withAuth({ pages: { signIn: "/login" } });
 
 export const config = {
   // Protect everything except login, NextAuth, public share links, the Android verification file,
