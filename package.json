@@ -13,7 +13,8 @@
     "check": "ts-node src/lib/totals.check.ts",
     "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
-    "create-admin": "ts-node prisma/create-admin.ts"
+    "create-admin": "ts-node prisma/create-admin.ts",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build"
   },
   "dependencies": {
     "@prisma/client": "^5.19.0",

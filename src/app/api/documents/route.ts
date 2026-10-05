@@ -4,7 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 
-const MAX_BYTES = 10 * 1024 * 1024;
+// Vercel rejects request bodies over ~4.5 MB, so cap uploads just under it.
+const MAX_BYTES = 4 * 1024 * 1024;
 
 /** Multipart upload: file + category + optional projectId / clientId / leadId. */
 export async function POST(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!form || !(file instanceof File) || file.size === 0) return NextResponse.json({ error: "Choose a file to upload." }, { status: 422 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "Files must be 10 MB or smaller." }, { status: 413 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: "Files must be 4 MB or smaller. Compress large photos or PDFs first." }, { status: 413 });
 
   const str = (k: string) => (form.get(k)?.toString().trim() || null);
   const [projectId, clientId, leadId] = [str("projectId"), str("clientId"), str("leadId")];

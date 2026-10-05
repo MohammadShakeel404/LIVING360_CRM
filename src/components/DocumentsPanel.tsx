@@ -107,7 +107,7 @@ function UploadModal({ target, targets, onClose, onDone }: { target?: { projectI
   const [category, setCategory] = useState("Drawings");
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
-  const tooBig = files.find((f) => f.size > 10 * 1024 * 1024);
+  const tooBig = files.find((f) => f.size > 4 * 1024 * 1024);
 
   async function upload() {
     setBusy(true);
@@ -141,10 +141,10 @@ function UploadModal({ target, targets, onClose, onDone }: { target?: { projectI
         >
           <Upload size={22} className="text-primary" />
           <span className="text-[13.5px] font-semibold text-ink">{files.length ? files.map((f) => f.name).join(", ") : "Tap to choose files, or drop them here"}</span>
-          <span className="text-[12px] text-ink-faint">Up to 10 MB each — images, PDFs, drawings, spreadsheets</span>
+          <span className="text-[12px] text-ink-faint">Up to 4 MB each — images, PDFs, drawings, spreadsheets</span>
         </button>
         <input ref={ref} type="file" multiple hidden onChange={(e) => setFiles(Array.from(e.target.files ?? []))} />
-        {tooBig && <div className="text-[12.5px] font-medium text-danger">{tooBig.name} is larger than 10 MB.</div>}
+        {tooBig && <div className="text-[12.5px] font-medium text-danger">{tooBig.name} is larger than 4 MB — please compress it first.</div>}
         <Field label="Category">
           <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>{DOC_CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>
         </Field>
