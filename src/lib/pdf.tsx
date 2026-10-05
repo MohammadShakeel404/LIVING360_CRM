@@ -430,7 +430,13 @@ function Signatures({ doc, co }: { doc: PdfDoc; co: CompanySettingsRow }) {
 }
 
 export async function renderPdf(doc: PdfDoc, co: CompanySettingsRow) {
-  return renderToBuffer(<PdfDocument doc={doc} co={co} />);
+  try {
+    return await renderToBuffer(<PdfDocument doc={doc} co={co} />);
+  } catch (e) {
+    // Shows up in Vercel → Logs with the document type, so failures can be traced.
+    console.error(`[pdf] ${doc.heading} render failed:`, e);
+    throw e;
+  }
 }
 
 export function pdfResponseHeaders(filename: string, inline: boolean) {
